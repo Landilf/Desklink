@@ -1,9 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.Shellink" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Base.Theme.Desklink" parent="android:style/Theme.Material.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
-    <style name="Theme.Shellink" parent="Base.Theme.Shellink" />
+    <style name="Theme.Desklink" parent="Base.Theme.Desklink" />
 </resources>

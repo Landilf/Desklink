@@ -1,5 +1,6 @@
-package ru.landilf.shellink
+package ru.landilf.desklink
 
+import ru.landilf.desklink.presentation.terminal.TerminalState
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
 import org.junit.Test

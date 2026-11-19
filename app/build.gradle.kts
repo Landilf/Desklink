@@ -4,10 +4,8 @@ plugins {
 }
 
 android {
-    namespace = "ru.landilf.shellink"
-    compileSdk {
-        version = release(37) { minorApiLevel = 1 }
-    }
+    namespace = "ru.landilf.desklink"
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "ru.landilf.shellink"
@@ -45,6 +43,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
     implementation(libs.sshj)
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation(libs.termux.terminal.emulator)
     implementation(libs.androidx.core.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -1,4 +1,4 @@
-package ru.landilf.shellink
+package ru.landilf.desklink
 
 import org.junit.Test
 

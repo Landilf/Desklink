@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Shellink"
+rootProject.name = "Desklink"
 include(":app")
