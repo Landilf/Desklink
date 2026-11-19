@@ -1,6 +1,7 @@
 package ru.landilf.desklink
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -18,6 +19,7 @@ class WayvncIntegrationTest {
             assertTrue(client.framebuffer.width > 0)
             assertTrue(client.framebuffer.height > 0)
             while (!client.readUpdate()) { /* Skip bell and clipboard events. */ }
+            assertEquals(16, client.lastEncoding)
         }
     }
 

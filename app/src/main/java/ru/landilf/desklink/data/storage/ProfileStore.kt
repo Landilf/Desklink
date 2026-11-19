@@ -36,7 +36,9 @@ class ProfileStore(private val context: Context) : ConnectionRepository {
         profile: SshProfile,
         password: String,
         privateKey: String,
-        passphrase: String
+        passphrase: String,
+        vncPassword: String,
+        clearVncPassword: Boolean
     ) {
         val normalized = profile.copy(id = profile.id.ifBlank { UUID.randomUUID().toString() })
         context.dataStore.edit { prefs ->
@@ -49,6 +51,8 @@ class ProfileStore(private val context: Context) : ConnectionRepository {
                 JSONArray().also { a -> list.forEach { a.put(it.toJson()) } }.toString()
         }
         val vault = SecretVault(context)
+        if (clearVncPassword) vault.delete("vnc-password:${normalized.id}")
+        else if (vncPassword.isNotEmpty()) vault.put("vnc-password:${normalized.id}", vncPassword)
         if (password.isNotEmpty()) {
             vault.put("password:${normalized.id}", password)
             vault.delete("key:${normalized.id}")
@@ -78,6 +82,7 @@ class ProfileStore(private val context: Context) : ConnectionRepository {
         SecretVault(context).delete("password:${profile.id}")
         SecretVault(context).delete("key:${profile.id}")
         SecretVault(context).delete("passphrase:${profile.id}")
+        SecretVault(context).delete("vnc-password:${profile.id}")
     }
 
     override suspend fun password(profile: SshProfile): String =
@@ -88,6 +93,9 @@ class ProfileStore(private val context: Context) : ConnectionRepository {
 
     override suspend fun passphrase(profile: SshProfile): String =
         SecretVault(context).get("passphrase:${profile.id}").orEmpty()
+
+    override suspend fun vncPassword(profile: SshProfile): String =
+        SecretVault(context).get("vnc-password:${profile.id}").orEmpty()
 
     override suspend fun fingerprint(host: String, port: Int): String? = runCatching {
         JSONObject(context.dataStore.data.first()[fingerprintsKey] ?: "{}").optString("$host:$port")

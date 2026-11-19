@@ -12,9 +12,12 @@ import java.nio.charset.StandardCharsets
 internal class RfbClient(input: InputStream, output: OutputStream, private val closeTransport: (() -> Unit)? = null) : Closeable {
     private val input = DataInputStream(input)
     private val output = DataOutputStream(output)
+    private val zrle = ZrleDecoder()
     lateinit var framebuffer: RawFramebuffer
         private set
     var desktopName: String = ""
+        private set
+    var lastEncoding: Int? = null
         private set
 
     fun initialize() {
@@ -40,7 +43,7 @@ internal class RfbClient(input: InputStream, output: OutputStream, private val c
         synchronized(output) {
             output.writeByte(0); output.write(byteArrayOf(0, 0, 0))
             output.write(byteArrayOf(32, 24, 0, 1, 0, -1, 0, -1, 0, -1, 16, 8, 0, 0, 0, 0))
-            output.writeByte(2); output.writeByte(0); output.writeShort(1); output.writeInt(0)
+            output.writeByte(2); output.writeByte(0); output.writeShort(2); output.writeInt(16); output.writeInt(0)
             output.flush()
         }
         requestUpdate(false)
@@ -55,8 +58,12 @@ internal class RfbClient(input: InputStream, output: OutputStream, private val c
                     val x = input.readUnsignedShort(); val y = input.readUnsignedShort()
                     val width = input.readUnsignedShort(); val height = input.readUnsignedShort()
                     val encoding = input.readInt()
-                    if (encoding != 0) throw IOException("Unsupported RFB encoding: $encoding")
-                    framebuffer.readRectangle(input, x, y, width, height)
+                    lastEncoding = encoding
+                    when (encoding) {
+                        0 -> framebuffer.readRectangle(input, x, y, width, height)
+                        16 -> zrle.read(input, framebuffer, x, y, width, height)
+                        else -> throw IOException("Unsupported RFB encoding: $encoding")
+                    }
                 }
                 requestUpdate(true)
                 return true
@@ -88,6 +95,6 @@ internal class RfbClient(input: InputStream, output: OutputStream, private val c
     }
 
     override fun close() {
-        try { closeTransport?.invoke() } finally { try { input.close() } finally { output.close() } }
+        try { closeTransport?.invoke() } finally { try { input.close() } finally { try { output.close() } finally { zrle.close() } } }
     }
 }

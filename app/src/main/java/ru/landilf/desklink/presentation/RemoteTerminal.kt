@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ru.landilf.desklink.R
 import ru.landilf.desklink.domain.model.SshProfile
@@ -62,7 +63,7 @@ import ru.landilf.desklink.presentation.terminal.TerminalState
 fun RemoteTerminal(vm: TerminalViewModel) {
     val state by vm.state.collectAsState()
     var desktopProfile by remember { mutableStateOf<SshProfile?>(null) }
-    desktopProfile?.let { profile -> DesktopScreen(profile, vm::startWayvnc, vm::stopWayvnc) { desktopProfile = null }; return }
+    desktopProfile?.let { profile -> DesktopScreen(profile, vm::startWayvnc, vm::stopWayvnc, vm::vncPassword) { desktopProfile = null }; return }
     var dialog by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<SshProfile?>(null) }
@@ -74,6 +75,8 @@ fun RemoteTerminal(vm: TerminalViewModel) {
     var vncPort by remember { mutableStateOf("5900") }
     var vncUsername by remember { mutableStateOf("") }
     var vncFingerprint by remember { mutableStateOf("") }
+    var vncPassword by remember { mutableStateOf("") }
+    var clearVncPassword by remember { mutableStateOf(false) }
     var profileTab by remember { mutableStateOf(0) }
     var password by remember { mutableStateOf("") };
     var tmux by remember { mutableStateOf(false) }
@@ -134,7 +137,7 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                     ); Spacer(Modifier.weight(1f)); Button(onClick = {
                     editingId = null; name = ""; host = ""; port = "22"; user = ""; password =
                     ""; keyText = ""; keyPass = ""; tmux = false; tmuxName = "codex";
-                    vncHost = ""; vncPort = "5900"; vncUsername = ""; vncFingerprint = ""; profileTab = 0; dialog = true
+                    vncHost = ""; vncPort = "5900"; vncUsername = ""; vncFingerprint = ""; vncPassword = ""; clearVncPassword = false; profileTab = 0; dialog = true
                 }) { Text(stringResource(R.string.add)) }
                 }
                 Text(state.status, Modifier.padding(vertical = 8.dp))
@@ -148,7 +151,7 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                                     profile.name,
                                     style = MaterialTheme.typography.titleMedium
                                 ); Text("${profile.username}@${profile.host}:${profile.port}")
-                                Row {
+                                Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                                     Button(onClick = { vm.connect(profile) }) {
                                         Text(
                                             stringResource(
@@ -164,6 +167,7 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                                         ""; keyText = ""; keyPass = ""
                                         vncHost = profile.vncHost; vncPort = profile.vncPort.toString()
                                         vncUsername = profile.vncUsername; vncFingerprint = profile.vncFingerprint
+                                        vncPassword = ""; clearVncPassword = false
                                         profileTab = 0; dialog = true
                                     }) {
                                         Icon(
@@ -177,9 +181,9 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                                             contentDescription = stringResource(R.string.delete_connection)
                                         )
                                     }
-                                }
-                                IconButton(onClick = { desktopProfile = profile }) {
-                                    Icon(painterResource(R.drawable.ic_desktop), contentDescription = stringResource(R.string.desktop_open))
+                                    IconButton(onClick = { desktopProfile = profile }) {
+                                        Icon(painterResource(R.drawable.ic_desktop), contentDescription = stringResource(R.string.desktop_open))
+                                    }
                                 }
                             }
                         }
@@ -304,7 +308,12 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                     OutlinedTextField(vncPort, { vncPort = it }, label = { Text(stringResource(R.string.port)) }, singleLine = true)
                     OutlinedTextField(vncUsername, { vncUsername = it }, label = { Text(stringResource(R.string.vnc_username)) }, singleLine = true)
                     OutlinedTextField(vncFingerprint, { vncFingerprint = it }, label = { Text(stringResource(R.string.desktop_fingerprint)) }, minLines = 2)
+                    OutlinedTextField(vncPassword, { vncPassword = it; if (it.isNotEmpty()) clearVncPassword = false }, label = { Text(stringResource(R.string.vnc_password)) }, singleLine = true, visualTransformation = PasswordVisualTransformation())
                     Text(stringResource(R.string.vnc_password_notice), style = MaterialTheme.typography.bodySmall)
+                    if (editingId != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(clearVncPassword, { clearVncPassword = it; if (it) vncPassword = "" })
+                        Text(stringResource(R.string.vnc_password_delete))
+                    }
                 }
             }
         },
@@ -322,7 +331,7 @@ fun RemoteTerminal(vm: TerminalViewModel) {
                     vncPort = vncPort.toIntOrNull() ?: 5900,
                     vncUsername = vncUsername.trim(),
                     vncFingerprint = vncFingerprint.trim()
-                ); vm.save(p, password, keyText, keyPass); dialog = false
+                ); vm.save(p, password, keyText, keyPass, vncPassword, clearVncPassword); vncPassword = ""; dialog = false
             }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {

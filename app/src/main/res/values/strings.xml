@@ -82,7 +82,8 @@
     <string name="vnc_host">Адрес VNC (пусто — адрес SSH)</string>
     <string name="vnc_username">Пользователь VNC (пусто — пользователь SSH)</string>
     <string name="vnc_password">Пароль рабочего стола</string>
-    <string name="vnc_password_notice">Пароль VNC вводится при подключении и не сохраняется.</string>
+    <string name="vnc_password_notice">Пароль хранится зашифрованным. Оставьте поле пустым, чтобы не менять сохранённый пароль.</string>
+    <string name="vnc_password_delete">Удалить сохранённый пароль VNC</string>
     <string name="vnc_fingerprint_missing">Добавьте отпечаток сертификата в настройках профиля.</string>
     <string name="vnc_fingerprint_saved">Отпечаток сертификата сохранён</string>
     <string name="desktop_connect_title">Подключение к экрану</string>
@@ -91,4 +92,10 @@
     <string name="desktop_start_error">Не удалось запустить wayvnc</string>
     <string name="desktop_retry">Повторить</string>
     <string name="desktop_stop_error">Не удалось остановить wayvnc: %1$s</string>
+    <string name="desktop_fullscreen">На весь экран</string>
+    <string name="desktop_fullscreen_exit">Оконный режим</string>
+    <string name="desktop_show_input">Клавиши</string>
+    <string name="desktop_hide_input">Скрыть клавиши</string>
+    <string name="desktop_hide_controls">Скрыть</string>
+    <string name="desktop_show_controls">Показать</string>
 </resources>

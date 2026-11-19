@@ -12,11 +12,15 @@ internal class RawFramebuffer(val width: Int, val height: Int) {
 
     val pixels = IntArray(width * height) { 0xff000000.toInt() }
 
-    @Throws(IOException::class)
-    fun readRectangle(input: DataInputStream, x: Int, y: Int, rectWidth: Int, rectHeight: Int) {
+    fun validateRectangle(x: Int, y: Int, rectWidth: Int, rectHeight: Int) {
         if (x < 0 || y < 0 || rectWidth <= 0 || rectHeight <= 0 ||
             x.toLong() + rectWidth > width || y.toLong() + rectHeight > height
         ) throw IOException("RFB rectangle exceeds framebuffer")
+    }
+
+    @Throws(IOException::class)
+    fun readRectangle(input: DataInputStream, x: Int, y: Int, rectWidth: Int, rectHeight: Int) {
+        validateRectangle(x, y, rectWidth, rectHeight)
 
         val row = ByteArray(rectWidth * 4)
         for (line in 0 until rectHeight) {

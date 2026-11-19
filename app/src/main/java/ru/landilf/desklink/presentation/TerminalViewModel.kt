@@ -6,8 +6,9 @@ import ru.landilf.desklink.domain.model.SshProfile
 
 class TerminalViewModel(private val manager: SshSessionManager) : ViewModel() {
     val state = manager.state
-    fun save(profile: SshProfile, password: String, key: String = "", passphrase: String = "") =
-        manager.save(profile, password, key, passphrase)
+    fun save(profile: SshProfile, password: String, key: String = "", passphrase: String = "", vncPassword: String = "", clearVncPassword: Boolean = false) =
+        manager.save(profile, password, key, passphrase, vncPassword, clearVncPassword)
+    suspend fun vncPassword(profile: SshProfile) = manager.vncPassword(profile)
 
     fun remove(profile: SshProfile) = manager.remove(profile)
     fun connect(profile: SshProfile) = manager.connect(profile)

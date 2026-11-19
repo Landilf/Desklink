@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.content.Context
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -14,11 +17,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -29,13 +37,14 @@ import ru.landilf.desklink.data.desktop.VeNCryptConnector
 import ru.landilf.desklink.domain.model.SshProfile
 
 @Composable
-fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String) -> Unit, stopWayvnc: (SshProfile, String) -> Unit, back: () -> Unit) {
+fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String) -> Unit, stopWayvnc: (SshProfile, String) -> Unit, loadVncPassword: suspend (SshProfile) -> String, back: () -> Unit) {
     val context = LocalContext.current
     val host = profile.vncHost.ifBlank { profile.host }
     val port = profile.vncPort
     val fingerprint = profile.vncFingerprint
     val username = profile.vncUsername.ifBlank { profile.username }
     var password by remember { mutableStateOf("") }
+    var passwordReady by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var client by remember { mutableStateOf<RfbClient?>(null) }
     var frame by remember { mutableStateOf<Bitmap?>(null) }
@@ -44,6 +53,29 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
     var starting by remember { mutableStateOf(true) }
     var startError by remember { mutableStateOf("") }
     var startAttempt by remember { mutableIntStateOf(0) }
+    var fullscreen by remember { mutableStateOf(false) }
+    var showInput by remember { mutableStateOf(false) }
+    var showControls by remember { mutableStateOf(true) }
+    val activity = remember(context) {
+        var current = context
+        while (current is ContextWrapper && current !is Activity) current = current.baseContext
+        current as? Activity
+    }
+    SideEffect {
+        val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        val orientation = if (fullscreen) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (activity != null && activity.requestedOrientation != orientation) activity.requestedOrientation = orientation
+        if (fullscreen) {
+            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        } else controller?.show(WindowInsetsCompat.Type.systemBars())
+    }
+    DisposableEffect(activity) {
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView).show(WindowInsetsCompat.Type.systemBars()) }
+        }
+    }
     val sessionName = remember { "desklink-vnc-" + java.util.UUID.randomUUID().toString().replace("-", "") }
     val disposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val stopRequested = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
@@ -51,6 +83,10 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
         if (stopRequested.compareAndSet(false, true)) stopWayvnc(profile, sessionName)
     }
     val scope = rememberCoroutineScope()
+    LaunchedEffect(profile.id) {
+        password = loadVncPassword(profile)
+        passwordReady = true
+    }
     LaunchedEffect(profile.id, startAttempt) {
         starting = true; startError = ""
         try {
@@ -65,15 +101,25 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
         requestStop()
         runCatching { client?.close() }
     } }
-    Column(Modifier.fillMaxSize().padding(12.dp)) {
-        Row {
-            TextButton(onClick = {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        if (showControls || client == null) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = {
                 requestStop()
                 runCatching { client?.close() }
                 client = null
                 back()
-            }) { Text(stringResource(R.string.close)) }
-            Text(profile.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            }) { Icon(painterResource(R.drawable.ic_disconnect), contentDescription = stringResource(R.string.close)) }
+            if (client == null) Text(profile.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            else Spacer(Modifier.weight(1f))
+            if (client != null) IconButton(onClick = { showInput = !showInput }) {
+                Icon(painterResource(R.drawable.ic_keyboard), contentDescription = stringResource(if (showInput) R.string.desktop_hide_input else R.string.desktop_show_input))
+            }
+            if (client != null) IconButton(onClick = { fullscreen = !fullscreen }) {
+                Icon(painterResource(if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen), contentDescription = stringResource(if (fullscreen) R.string.desktop_fullscreen_exit else R.string.desktop_fullscreen))
+            }
+            if (client != null) IconButton(onClick = { showControls = false; showInput = false }) {
+                Icon(painterResource(R.drawable.ic_hide_controls), contentDescription = stringResource(R.string.desktop_hide_controls))
+            }
         }
         if (starting) {
             Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -86,7 +132,7 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
             Text(startError, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = { startAttempt++ }) { Text(stringResource(R.string.desktop_retry)) }
         } else if (client == null) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.desktop_connect_title), style = MaterialTheme.typography.headlineSmall)
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -95,9 +141,9 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
                         Text(stringResource(if (fingerprint.isBlank()) R.string.vnc_fingerprint_missing else R.string.vnc_fingerprint_saved), style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.vnc_password)) }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), enabled = passwordReady, label = { Text(stringResource(R.string.vnc_password)) }, singleLine = true, visualTransformation = PasswordVisualTransformation())
                 if (status.isNotBlank()) Text(status, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                Button(enabled = !connecting, onClick = {
+                Button(enabled = !connecting && passwordReady, onClick = {
                     val pin = fingerprint.filterNot { it == ':' || it.isWhitespace() }
                     if (!pin.matches(Regex("[0-9a-fA-F]{64}")) || port !in 1..65535 || host.isBlank()) {
                         status = context.getString(R.string.desktop_invalid); return@Button
@@ -130,8 +176,16 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
                 }
             }
         } else {
-            AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { DesktopView(it) }, update = { it.frame = frame; it.client = client; it.invalidate() })
-            Row {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                AndroidView(modifier = Modifier.fillMaxSize(), factory = { DesktopView(it) }, update = { it.frame = frame; it.client = client; it.invalidate() })
+                if (!showControls) Surface(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp), shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+                    IconButton(onClick = { showControls = true }) {
+                        Icon(painterResource(R.drawable.ic_show_controls), contentDescription = stringResource(R.string.desktop_show_controls))
+                    }
+                }
+            }
+            if (showControls && showInput) Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(input, { input = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.desktop_input)) })
                 TextButton(onClick = {
                     val target = client
@@ -157,6 +211,7 @@ fun DesktopScreen(profile: SshProfile, startWayvnc: suspend (SshProfile, String)
                         }
                     }) { Text(label) }
                 }
+            }
             }
         }
     }

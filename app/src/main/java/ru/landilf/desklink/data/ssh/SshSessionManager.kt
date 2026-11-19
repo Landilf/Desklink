@@ -57,10 +57,11 @@ class SshSessionManager(
         }
     }
 
-    fun save(profile: SshProfile, password: String, key: String = "", passphrase: String = "") =
+    fun save(profile: SshProfile, password: String, key: String = "", passphrase: String = "", vncPassword: String = "", clearVncPassword: Boolean = false) =
         scope.launch {
-            repo.save(profile, password, key, passphrase)
+            repo.save(profile, password, key, passphrase, vncPassword, clearVncPassword)
         }
+    suspend fun vncPassword(profile: SshProfile) = withContext(Dispatchers.IO) { repo.vncPassword(profile) }
 
     fun remove(profile: SshProfile) = scope.launch { repo.remove(profile) }
     fun connect(profile: SshProfile) {
